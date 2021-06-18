@@ -107,7 +107,7 @@ def valid_token(resp):
 @app.route("/add_playlist_data")
 def add_playlist_data():
     if 'auth_header' in session:
-        auth_header = session['auth_header']
+        auth_header = checkToken()
         connection = db_connection()
         cursor = connection.cursor()
         cursor.execute("""SELECT name,playlist_id, id, today_followers,yesterday_followers FROM playlists""")
@@ -149,37 +149,8 @@ def add_playlist_data():
                         [track_id, id_playlist, tname, popularity, added_at])
                     connection.commit()
         return 'inserted';
-
-@app.route("/add_tracks_data")
-def add_tracks_data():
-    if 'auth_header' in session:
-        auth_header = checkToken()
-        connection = db_connection()
-        cursor = connection.cursor()
-        cursor.execute("""SELECT playlist_id, id FROM playlists""")
-        rows = cursor.fetchall()
-        for row in rows:
-            playlist_id = row['playlist_id']
-            id_playlist = row['id']
-            get_playlist_details = spotify.get_playlist_details(auth_header, playlist_id)
-            total_followers      = get_playlist_details['followers']['total']
-            name                 = get_playlist_details['name']
-            cursor.execute("UPDATE playlists SET name = ? , followers = ? WHERE playlist_id = ?", (name, total_followers,playlist_id))  
-            items = get_playlist_details['tracks']['items']
-            cursor.execute("DELETE FROM tracks where playlist_id = ?", (id_playlist) )
-            connection.commit()
-            for item in items:  
-                if item['track'] is not None:
-                    track_id   = item['track']['id']
-                    tname      = item['track']['name']
-                    popularity = item['track']['popularity']
-                    added_at   = item['added_at']   
-                    cursor.execute("INSERT INTO tracks(track_id, playlist_id ,name , popularity, added_at)  VALUES (?,?,?,?,?)", 
-                            [track_id,id_playlist,tname,popularity,added_at])      
-        connection.commit()
-        return 'inserted'
     else:
-        return 'Auth Error'
+    	return 'Error'
 
 def checkToken():
     if 'expiry_datetime' in session:
