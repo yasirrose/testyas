@@ -108,7 +108,6 @@ def valid_token(resp):
 def add_playlist_data():
     if 'auth_header' in session:
         auth_header = session['auth_header']
-        return auth_header
         connection = db_connection()
         cursor = connection.cursor()
         cursor.execute("""SELECT name,playlist_id, id, today_followers,yesterday_followers FROM playlists""")
