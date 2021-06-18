@@ -1,9 +1,9 @@
 from __future__ import print_function
+from flask import session
 import base64
 import json
 import requests
 import sys
-
 
 # Workaround to support both python 2 & 3
 try:
@@ -12,8 +12,6 @@ try:
 except ImportError:
     import urllib as urllibparse
 
-
-# ----------------- 0. SPOTIFY BASE URL ----------------
 
 SPOTIFY_API_BASE_URL = 'https://api.spotify.com'
 API_VERSION = "v1"
@@ -27,9 +25,9 @@ SPOTIFY_AUTH_URL = SPOTIFY_AUTH_BASE_URL.format('authorize')
 SPOTIFY_TOKEN_URL = SPOTIFY_AUTH_BASE_URL.format('api/token')
 
 # client keys
-CLIENT = json.load(open('conf.json', 'r+'))
-CLIENT_ID = CLIENT['id']
-CLIENT_SECRET = CLIENT['secret']
+# CLIENT = json.load(open('conf.json', 'r+'))
+CLIENT_ID = 'fc1d06d724f1471c8f92aaf37e8932f5'
+CLIENT_SECRET = '5916cd1c390d4c89a438b2088642f9bd'
 
 # server side parameter
 # * fell free to change it if you want to, but make sure to change in
@@ -42,6 +40,10 @@ STATE = ""
 SHOW_DIALOG_bool = True
 SHOW_DIALOG_str = str(SHOW_DIALOG_bool).lower()
 
+
+# token_data will hold authentication header with access code, the allowed scopes, and the refresh countdown
+TOKEN_DATA = []
+REFRESH_TOKEN = ''
 # https://developer.spotify.com/web-api/authorization-guide/
 auth_query_parameters = {
     "response_type": "code",
@@ -52,110 +54,66 @@ auth_query_parameters = {
     "client_id": CLIENT_ID
 }
 
-#python 3
-if sys.version_info[0] >= 3:
-    URL_ARGS = "&".join(["{}={}".format(key, urllibparse.quote(val))
-                    for key, val in list(auth_query_parameters.items())])
-else: 
-    URL_ARGS = "&".join(["{}={}".format(key, urllibparse.quote(val))
-                    for key, val in auth_query_parameters.iteritems()])
 
-
+URL_ARGS = "&".join(["{}={}".format(key, urllibparse.quote(val))
+                         for key, val in list(auth_query_parameters.items())])
 AUTH_URL = "{}/?{}".format(SPOTIFY_AUTH_URL, URL_ARGS)
-
-'''
-    This function must be used with the callback method present in the
-    ../app.py file.
-
-    And of course this will only works if ouath == True
-
-'''
 
 
 def authorize(auth_token):
-
     code_payload = {
         "grant_type": "authorization_code",
         "code": str(auth_token),
         "redirect_uri": REDIRECT_URI
     }
-    
-    #python 3 or above
-    if sys.version_info[0] >= 3:
-        base64encoded = base64.b64encode(("{}:{}".format(CLIENT_ID, CLIENT_SECRET)).encode())
-        headers = {"Authorization": "Basic {}".format(base64encoded.decode())}
-    else: 
-        base64encoded = base64.b64encode("{}:{}".format(CLIENT_ID, CLIENT_SECRET))
-        headers = {"Authorization": "Basic {}".format(base64encoded)}
 
-    post_request = requests.post(SPOTIFY_TOKEN_URL, data=code_payload,
-                                 headers=headers)
+
+    base64encoded = base64.b64encode(("{}:{}".format(CLIENT_ID, CLIENT_SECRET)).encode())
+    headers = {"Authorization": "Basic {}".format(base64encoded.decode())}
+    post_request = requests.post(SPOTIFY_TOKEN_URL, data=code_payload, headers=headers)
 
     # tokens are returned to the app
-    response_data = json.loads(post_request.text)
+    response_data = post_request.json()
+
+    # For saving the token in file
+    token = json.dumps(response_data, indent=4)
+    file = '{}.json'.format('token')
+    with open(file, 'w+') as f:
+        f.write(token)
+
     access_token = response_data["access_token"]
-    REFRESH_TOKEN = response_data["refresh_token"]
-    print(REFRESH_TOKEN)
+    refresh_token = response_data["refresh_token"]
+    session['refresh_token'] = refresh_token
+    current_datetime = datetime.datetime.now()
+    expiry_datetime = current_datetime + datetime.timedelta(0, 3600)
+    session['expiry_datetime'] = expiry_datetime
 
     # use the access token to access Spotify API
     auth_header = {"Authorization": "Bearer {}".format(access_token)}
     return auth_header
 
-# ---------------- 2. ARTISTS ------------------------
-# https://developer.spotify.com/web-api/artist-endpoints/
 
-GET_ARTIST_ENDPOINT = "{}/{}".format(SPOTIFY_API_URL, 'artists')  # /<id>
-
-
-# https://developer.spotify.com/web-api/get-artist/
-def get_artist(artist_id):
-    url = "{}/{id}".format(GET_ARTIST_ENDPOINT, id=artist_id)
-    resp = requests.get(url)
-    return resp.json()
-
-
-# https://developer.spotify.com/web-api/get-several-artists/
-def get_several_artists(list_of_ids):
-    url = "{}/?ids={ids}".format(GET_ARTIST_ENDPOINT, ids=','.join(list_of_ids))
-    resp = requests.get(url)
-    return resp.json()
-
-# https://developer.spotify.com/web-api/get-artists-albums/
-def get_artists_albums(artist_id):
-    url = "{}/{id}/albums".format(GET_ARTIST_ENDPOINT, id=artist_id)
-    resp = requests.get(url)
-    return resp.json()
-
-# https://developer.spotify.com/web-api/get-artists-top-tracks/
-def get_artists_top_tracks(artist_id, country='US'):
-    url = "{}/{id}/top-tracks".format(GET_ARTIST_ENDPOINT, id=artist_id)
-    myparams = {'country': country}
-    resp = requests.get(url, params=myparams)
-    return resp.json()
-
-# https://developer.spotify.com/web-api/get-related-artists/
-def get_related_artists(artist_id):
-    url = "{}/{id}/related-artists".format(GET_ARTIST_ENDPOINT, id=artist_id)
-    resp = requests.get(url)
-    return resp.json()
-
-# ----------------- 3. SEARCH ------------------------
-# https://developer.spotify.com/web-api/search-item/
-
-SEARCH_ENDPOINT = "{}/{}".format(SPOTIFY_API_URL, 'search')
+def handleToken(response):
+    auth_header = {"Authorization": "Bearer {}".format(response["access_token"])}
+    session['refresh_token'] = response["refresh_token"]
+    current_datetime = datetime.datetime.now()
+    expiry_datetime = current_datetime + datetime.timedelta(0, 3600)
+    session['expiry_datetime'] = expiry_datetime
+    session['auth_header'] = auth_header
+    print('Refreshed Token')
+    return auth_header
 
 
-# https://developer.spotify.com/web-api/search-item/
-def search(search_type, name):
-    if search_type not in ['artist', 'track', 'album', 'playlist']:
-        print('invalid type')
-        return None
-    myparams = {'type': search_type}
-    myparams['q'] = name
-    resp = requests.get(SEARCH_ENDPOINT, params=myparams)
-    return resp.json()
+def refreshAuth():
+    body = {
+        "grant_type": "refresh_token",
+        "refresh_token": session['refresh_token']
+    }
 
-# ------------------ 4. USER RELATED REQUETS  ---------- #
+    post_refresh = requests.post(SPOTIFY_TOKEN_URL, data=body, headers=HEADER)
+    p_back = json.dumps(post_refresh.text)
+
+    return handleToken(p_back)
 
 
 # spotify endpoints
@@ -178,94 +136,8 @@ def get_users_profile(auth_header):
     return resp.json()
 
 
-# https://developer.spotify.com/web-api/get-a-list-of-current-users-playlists/
-def get_users_playlists(auth_header):
-    url = USER_PLAYLISTS_ENDPOINT
-    resp = requests.get(url, headers=auth_header)
-    return resp.json()
-
-
-# https://developer.spotify.com/web-api/get-users-top-artists-and-tracks/
-def get_users_top(auth_header, t):
-    if t not in ['artists', 'tracks']:
-        print('invalid type')
-        return None
-    url = "{}/{type}".format(USER_TOP_ARTISTS_AND_TRACKS_ENDPOINT, type=t)
-    resp = requests.get(url, headers=auth_header)
-    print(resp)
-
-# https://developer.spotify.com/web-api/web-api-personalization-endpoints/get-recently-played/
-def get_users_recently_played(auth_header):
-    url = USER_RECENTLY_PLAYED_ENDPOINT
-    resp = requests.get(url, headers=auth_header)
-    return resp.json()
-
-# https://developer.spotify.com/web-api/get-list-featured-playlists/
-def get_featured_playlists(auth_header):
-    url = BROWSE_FEATURED_PLAYLISTS
-    resp = requests.get(url, headers=auth_header)
-    return resp.json()
-
-def get_playlist_details(auth_header,platylist_id):
-    url  = PLAYLIST_DETAILS
-    url  = url+platylist_id
-    resp = requests.get(url, headers=auth_header)
-    return resp.json()
-
-# ---------------- 5. ALBUMS ------------------------
-# https://developer.spotify.com/web-api/album-endpoints/
-
-GET_ALBUM_ENDPOINT = "{}/{}".format(SPOTIFY_API_URL, 'albums')  # /<id>
-
-# https://developer.spotify.com/web-api/get-album/
-def get_album(album_id):
-    url = "{}/{id}".format(GET_ALBUM_ENDPOINT, id=album_id)
-    resp = requests.get(url)
-    return resp.json()
-
-# https://developer.spotify.com/web-api/get-several-albums/
-def get_several_albums(list_of_ids):
-    url = "{}/?ids={ids}".format(GET_ALBUM_ENDPOINT, ids=','.join(list_of_ids))
-    resp = requests.get(url)
-    return resp.json()
-
-# https://developer.spotify.com/web-api/get-albums-tracks/
-def get_albums_tracks(album_id):
-    url = "{}/{id}/tracks".format(GET_ALBUM_ENDPOINT, id=album_id)
-    resp = requests.get(url)
-    return resp.json()
-
-# ------------------ 6. USERS ---------------------------
-# https://developer.spotify.com/web-api/user-profile-endpoints/
-
-GET_USER_ENDPOINT = '{}/{}'.format(SPOTIFY_API_URL, 'users')
-
-# https://developer.spotify.com/web-api/get-users-profile/
-def get_user_profile(user_id):
-    url = "{}/{id}".format(GET_USER_ENDPOINT, id=user_id)
-    resp = requests.get(url)
-    return resp.json()
-
-# ---------------- 7. TRACKS ------------------------
-# https://developer.spotify.com/web-api/track-endpoints/
-
-GET_TRACK_ENDPOINT = "{}/{}".format(SPOTIFY_API_URL, 'tracks')  # /<id>
-
-# https://developer.spotify.com/web-api/get-track/
-def get_track(track_id):
-    url = "{}/{id}".format(GET_TRACK_ENDPOINT, id=track_id)
-    resp = requests.get(url)
-    return resp.json()
-
-# https://developer.spotify.com/web-api/get-several-tracks/
-def get_several_tracks(list_of_ids):
-    url = "{}/?ids={ids}".format(GET_TRACK_ENDPOINT, ids=','.join(list_of_ids))
-    resp = requests.get(url)
-    return resp.json()
-
-
 # https://developer.spotify.com/console/get-playlist-tracks/
-def get_tracks(playlist_id,auth_header):
+def get_tracks(playlist_id, auth_header):
     url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
     resp = requests.get(url, headers=auth_header)
     return resp.json()

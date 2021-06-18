@@ -81,7 +81,8 @@ def index():
     if 'auth_header' in session:
         auth_header = session['auth_header']
         profile_data = spotify.get_users_profile(auth_header)
-        if recently_played is not None and not 'error' in recently_played:
+        print(profile_data)
+        if profile_data is not None and not 'error' in profile_data:
             return render_template("index.html", user=profile_data)
     return render_template('index.html')
 
