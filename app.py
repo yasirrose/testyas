@@ -156,6 +156,7 @@ def featured_playlists():
 def add_playlist_data():
     if 'auth_header' in session:
         auth_header = session['auth_header']
+        return auth_header
         connection = db_connection()
         cursor = connection.cursor()
         cursor.execute("""SELECT name,playlist_id, id, today_followers,yesterday_followers FROM playlists""")
@@ -172,7 +173,7 @@ def add_playlist_data():
 
             if today_followers == 0:
                 yesterday_followers = total_followers
-                
+
             if total_followers > today_followers:
                 yesterday_followers = today_followers
             else:
@@ -199,7 +200,7 @@ def add_playlist_data():
 @app.route("/add_tracks_data")
 def add_tracks_data():
     if 'auth_header' in session:
-        auth_header = session['auth_header']
+        auth_header = checkToken()
         connection = db_connection()
         cursor = connection.cursor()
         cursor.execute("""SELECT playlist_id, id FROM playlists""")
@@ -227,6 +228,16 @@ def add_tracks_data():
     else:
         return 'Auth Error'
 
+def checkToken():
+    if 'expiry_datetime' in session:
+        expiry_datetime  = session['expiry_datetime']
+        current_datetime = datetime.datetime.now()
+        if expiry_datetime <= current_datetime:
+            auth_header = spotify.refreshAuth()  
+        return auth_header      
+    else:
+        auth_header = session['auth_header']
+        return auth_header 
 
 if __name__ == "__main__":
     app.run(debug=True, port=spotify.PORT)

@@ -1,4 +1,5 @@
 from __future__ import print_function
+from flask import session
 import base64
 import json
 import requests
@@ -39,9 +40,9 @@ SPOTIFY_AUTH_URL = SPOTIFY_AUTH_BASE_URL.format('authorize')
 SPOTIFY_TOKEN_URL = SPOTIFY_AUTH_BASE_URL.format('api/token')
 
 # client keys
-CLIENT = json.load(open('conf.json', 'r+'))
-CLIENT_ID = CLIENT['id']
-CLIENT_SECRET = CLIENT['secret']
+# CLIENT = json.load(open('conf.json', 'r+'))
+CLIENT_ID = 'fc1d06d724f1471c8f92aaf37e8932f5'
+CLIENT_SECRET = '5916cd1c390d4c89a438b2088642f9bd'
 
 # server side parameter
 # * fell free to change it if you want to, but make sure to change in
@@ -54,6 +55,9 @@ STATE = ""
 SHOW_DIALOG_bool = True
 SHOW_DIALOG_str = str(SHOW_DIALOG_bool).lower()
 
+#token_data will hold authentication header with access code, the allowed scopes, and the refresh countdown 
+TOKEN_DATA = []
+REFRESH_TOKEN = ''
 # https://developer.spotify.com/web-api/authorization-guide/
 auth_query_parameters = {
     "response_type": "code",
@@ -82,8 +86,6 @@ AUTH_URL = "{}/?{}".format(SPOTIFY_AUTH_URL, URL_ARGS)
     And of course this will only works if ouath == True
 
 '''
-
-
 def authorize(auth_token):
 
     code_payload = {
@@ -105,13 +107,37 @@ def authorize(auth_token):
 
     # tokens are returned to the app
     response_data = json.loads(post_request.text)
-    access_token = response_data["access_token"]
-    REFRESH_TOKEN = response_data["refresh_token"]
-    print(REFRESH_TOKEN)
+    access_token  = response_data["access_token"]
+    refresh_token = response_data["refresh_token"]    
+    session['refresh_token']  = refresh_token
+    current_datetime = datetime.datetime.now()
+    expiry_datetime  = current_datetime + datetime.timedelta(0,3600)    
+    session['expiry_datetime'] = expiry_datetime
 
     # use the access token to access Spotify API
     auth_header = {"Authorization": "Bearer {}".format(access_token)}
     return auth_header
+
+def handleToken(response):
+    auth_header = {"Authorization": "Bearer {}".format(response["access_token"])}
+    session['refresh_token']  = response["refresh_token"]
+    current_datetime = datetime.datetime.now()
+    expiry_datetime  = current_datetime + datetime.timedelta(0,3600)    
+    session['expiry_datetime'] = expiry_datetime
+    session['auth_header']    = auth_header
+    print('Refreshed Token')
+    return auth_header
+
+def refreshAuth():
+    body = {
+        "grant_type" : "refresh_token",
+        "refresh_token" : session['refresh_token']
+    }
+
+    post_refresh = requests.post(SPOTIFY_TOKEN_URL, data=body, headers=HEADER)
+    p_back = json.dumps(post_refresh.text)
+    
+    return handleToken(p_back)
 
 # ---------------- 2. ARTISTS ------------------------
 # https://developer.spotify.com/web-api/artist-endpoints/
