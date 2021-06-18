@@ -3,7 +3,7 @@ import spotify
 import json
 
 import sqlite3
-from os import path,getcwd
+from os import path, getcwd
 import re
 import os
 import sys
@@ -24,6 +24,7 @@ def db_connection():
 
 connection = db_connection()
 cursor = connection.cursor()
+
 
 @app.cli.command("create_db")
 def create_db():
@@ -58,7 +59,7 @@ def create_db():
 
 @app.cli.command("add_playlists")
 def add_playlists():
-    playlists:List = [
+    playlists = [
         "37i9dQZF1DX0XUsuxWHRQd",
         "37i9dQZF1DX4SrOBCjlfVi",
         "37i9dQZF1DWW4igXXl2Qkp",
@@ -71,8 +72,8 @@ def add_playlists():
     ]
     for playlist in playlists:
         cursor.execute("INSERT INTO playlists(playlist_id)  VALUES (?)", [playlist])
-
     connection.commit()
+    print("Added playlist entries")
 
 
 @app.route("/")
@@ -83,6 +84,7 @@ def index():
         if recently_played is not None and not 'error' in recently_played:
             return render_template("index.html", user=profile_data)
     return render_template('index.html')
+
 
 @app.route("/auth")
 def auth():
@@ -116,32 +118,34 @@ def add_playlist_data():
             yesterday_followers = row['yesterday_followers']
 
             get_playlist_details = spotify.get_playlist_details(auth_header, playlist_id)
-            total_followers      = get_playlist_details['followers']['total']
-            name                 = get_playlist_details['name']
+            total_followers = get_playlist_details['followers']['total']
+            name = get_playlist_details['name']
 
             if today_followers == 0:
                 yesterday_followers = total_followers
-                
+
             if total_followers > today_followers:
                 yesterday_followers = today_followers
             else:
                 total_followers = today_followers
-            #insert playlist data
-            cursor.execute("UPDATE playlists SET name = ? , today_followers = ? , yesterday_followers = ?  WHERE playlist_id = ?",
-                 (name, total_followers, yesterday_followers , playlist_id))
+            # insert playlist data
+            cursor.execute(
+                "UPDATE playlists SET name = ? , today_followers = ? , yesterday_followers = ?  WHERE playlist_id = ?",
+                (name, total_followers, yesterday_followers, playlist_id))
             connection.commit()
-            #insert tracks data      
+            # insert tracks data
             items = get_playlist_details['tracks']['items']
-            cursor.execute("DELETE FROM tracks where playlist_id = ?", [id_playlist] )
+            cursor.execute("DELETE FROM tracks where playlist_id = ?", [id_playlist])
             connection.commit()
-            for item in items:  
+            for item in items:
                 if item['track'] is not None:
-                    track_id   = item['track']['id']
-                    tname      = item['track']['name']
+                    track_id = item['track']['id']
+                    tname = item['track']['name']
                     popularity = item['track']['popularity']
-                    added_at   = item['added_at']   
-                    cursor.execute("INSERT INTO tracks(track_id, playlist_id ,name , popularity, added_at)  VALUES (?,?,?,?,?)", 
-                            [track_id,id_playlist,tname,popularity,added_at])
+                    added_at = item['added_at']
+                    cursor.execute(
+                        "INSERT INTO tracks(track_id, playlist_id ,name , popularity, added_at)  VALUES (?,?,?,?,?)",
+                        [track_id, id_playlist, tname, popularity, added_at])
                     connection.commit()
         return 'inserted';
 
