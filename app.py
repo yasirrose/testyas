@@ -212,19 +212,25 @@ def promotion_ranking():
 		result.append(val + percent_followers[i] )
 
 	i = 1
+	ids = []
 	for row in playlists:		
 		cursor.execute("UPDATE playlists SET ranking = ?  WHERE playlist_id = ?",(i, row['playlist_id'] ))
+		ids.append(row['playlist_id'])
 		i = i + 1	
 	connection.commit()	
 
 
-	cursor.execute("SELECT today_followers , playlist_id from playlists WHERE ranking IS NULL AND id != 1 ORDER BY today_followers DESC")
+	query = 'SELECT today_followers , playlist_id , id from playlists WHERE playlist_id NOT IN (%s) ORDER BY today_followers DESC' % ','.join('?' for i in ids)
+	cursor.execute(query, ids)
 	playlists = cursor.fetchall()
+	# cursor.execute("SELECT today_followers , playlist_id from playlists WHERE ranking NOT IN AND id != 1 ORDER BY today_followers DESC")
+	# playlists = cursor.fetchall()
 
 	for row in playlists:
-		cursor.execute("UPDATE playlists SET ranking = ?  WHERE playlist_id = ?",(i, row['playlist_id'] ))
-		i = i + 1	
-	connection.commit()	
+		if row['id'] != 1:
+			cursor.execute("UPDATE playlists SET ranking = ?  WHERE playlist_id = ?",(i, row['playlist_id'] ))
+			i = i + 1	
+		connection.commit()	
 	print(playlists)
 
 
