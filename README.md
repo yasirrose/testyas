@@ -1,17 +1,28 @@
 # Spotify Playlists Ranking
 
 ## Overview
-This 
+This is a App for calculating the Promotion Playlists Ranking based upon the tracks on their list makes to the targeted List "RapCaviar" playlist. Ranking is calculated numbers of tracks makes to the RapCaviar and the particular playlist followers. We have used Flask for the web view as we need to show the ranking on the page.
 
 ## Run it
 
-1. Follow [this tutorial](https://developer.spotify.com/web-api/tutorial/) to create your own Spotify App. Then add "http://127.0.0.1:8081/callback/" as a redirect URI.  
+1. Clone project and Open Command Line in the Project directory and run followings commands:
 
-2. Create a file named **conf.json** in this folder with the exact same structure of the conf_example.json file.  
+```
+python -m venv env
+.\env\Scripts\activate
+pip install -r requirements.txt
+flask created_db
+flask add_playlists
+python app.py
+```
 
-3. Run python app.py to see an application using the code present here :bowtie:.
+1. For adding tables to the database "flask created_db" , "flask add_playlists" to add playlist Ids to table for fecthing data.
+2. python app.py to run the application.
+3. CLick on the Login Tab to get access to the account.
+4. For pulling playlist tracks data for calculation hit http://127.0.0.1:8081/add_playlist_data in the browser.
+5. For Ranking Calculation hit http://127.0.0.1:8081/promotion_ranking  in the browser.
+6. For viewing Ranking you can check here: http://127.0.0.1:8081/ranking in the browser.
 
-## What facilities this application offers?
 
- * Support to a complete example (that you can use as base for your own project) of an application using Flask to talk to the Spotify API.  
- * [Python API](https://github.com/mari-linhares/spotify-flask/tree/master/api) that makes very simple to use Spotify API in your Python code.
+
+

@@ -37,6 +37,7 @@ CLIENT_SIDE_URL = "http://127.0.0.1"
 PORT = 8081
 REDIRECT_URI = "{}:{}/callback/".format(CLIENT_SIDE_URL, PORT)
 SCOPE = "playlist-modify-public playlist-modify-private user-read-recently-played user-top-read"
+HEADER = "application/x-www-form-urlencoded"
 STATE = ""
 SHOW_DIALOG_bool = True
 SHOW_DIALOG_str = str(SHOW_DIALOG_bool).lower()
@@ -86,7 +87,7 @@ def authorize(auth_token):
     refresh_token = response_data["refresh_token"]
     session['refresh_token'] = refresh_token
     current_datetime = datetime.datetime.now()
-    expiry_datetime = current_datetime + datetime.timedelta(0, 3600)
+    expiry_datetime  = current_datetime + datetime.timedelta(0, 3600)    
     session['expiry_datetime'] = expiry_datetime
 
     # use the access token to access Spotify API
@@ -96,9 +97,8 @@ def authorize(auth_token):
 
 def handleToken(response):
     auth_header = {"Authorization": "Bearer {}".format(response["access_token"])}
-    session['refresh_token'] = response["refresh_token"]
     current_datetime = datetime.datetime.now()
-    expiry_datetime = current_datetime + datetime.timedelta(0, 3600)
+    expiry_datetime  = current_datetime + datetime.timedelta(0, 3600)
     session['expiry_datetime'] = expiry_datetime
     session['auth_header'] = auth_header
     print('Refreshed Token')
@@ -110,10 +110,12 @@ def refreshAuth():
         "grant_type": "refresh_token",
         "refresh_token": session['refresh_token']
     }
-
-    post_refresh = requests.post(SPOTIFY_TOKEN_URL, data=body, headers=HEADER)
-    p_back = json.dumps(post_refresh.text)
-
+    base64encoded = base64.b64encode(("{}:{}".format(CLIENT_ID, CLIENT_SECRET)).encode())
+    headers = {"Authorization": "Basic {}".format(base64encoded.decode())}
+    # headers = { 'content-type': "application/x-www-form-urlencoded" }
+    post_refresh = requests.post(SPOTIFY_TOKEN_URL, data=body, headers=headers)
+    p_back = post_refresh.json()
+    print(p_back)
     return handleToken(p_back)
 
 
@@ -140,5 +142,11 @@ def get_users_profile(auth_header):
 # https://developer.spotify.com/console/get-playlist-tracks/
 def get_tracks(playlist_id, auth_header):
     url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+    resp = requests.get(url, headers=auth_header)
+    return resp.json()
+
+def get_playlist_details(auth_header,platylist_id):
+    url  = PLAYLIST_DETAILS
+    url  = url+platylist_id
     resp = requests.get(url, headers=auth_header)
     return resp.json()
